@@ -1,9 +1,12 @@
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
 
-const FlashCardForm = ({ setFlashcards, setLoading }) => {
+import DifficultySelect from "./DifficultySelect";
+
+const FlashCardForm = ({ setFlashcards, setLoading, setError }) => {
   const [categories, setCategories] = useState();
-  const categoryEl = useRef();
+  const categoryRef = useRef();
+  const difficultyRef = useRef();
   const amountRef = useRef();
 
   useEffect(() => {
@@ -12,35 +15,49 @@ const FlashCardForm = ({ setFlashcards, setLoading }) => {
     });
   }, []);
 
-  const submitHandler = (e) => {
+  const submitHandler = async (e) => {
     e.preventDefault();
+    if (!categories.length) return;
+
     setLoading(true);
-    axios
-      .get("https://opentdb.com/api.php?", {
+    setError("");
+
+    try {
+      const { data } = await axios.get("https://opentdb.com/api.php?", {
         params: {
           amount: amountRef.current.value,
-          category: categoryEl.current.value,
+          category: categoryRef.current.value,
+          difficulty: difficultyRef.current.value,
         },
-      })
-      .then((res) => {
-        console.log("res.data.results", res.data.results);
-        setFlashcards(
-          res.data.results.map((questionItem, index) => {
-            const answer = decodeString(questionItem.correct_answer);
-            const options = [
-              ...questionItem.incorrect_answers.map((a) => decodeString(a)),
-              answer,
-            ];
-            return {
-              id: `${index}-${Date.now}`,
-              question: decodeString(questionItem.question),
-              options: options.sort(() => Math.random() - 0.5),
-              answer,
-            };
-          })
-        );
       });
-    setLoading(fasle);
+
+      if (!data.results.length) {
+        setError("No Questions Founded...");
+        setFlashcards([]);
+        return;
+      }
+      setFlashcards(
+        data.results.map((questionItem, index) => {
+          const answer = decodeString(questionItem.correct_answer);
+          const options = [
+            ...questionItem.incorrect_answers.map((a) => decodeString(a)),
+            answer,
+          ];
+          return {
+            id: `${index}-${Date.now}`,
+            question: decodeString(questionItem.question),
+            options: options.sort(() => Math.random() - 0.5),
+            answer,
+          };
+        })
+      );
+      if (res.data.results.length === 0) setError("No Questions Founded...");
+    } catch (error) {
+      setError("An error occured, please try again later");
+    }
+
+    setLoading(false);
+    setError("");
   };
 
   const decodeString = (str) => {
@@ -53,7 +70,7 @@ const FlashCardForm = ({ setFlashcards, setLoading }) => {
     <form onSubmit={submitHandler} className="header">
       <div className="form-group">
         <label htmlFor="category">Category</label>
-        <select id="category" ref={categoryEl}>
+        <select id="category" ref={categoryRef}>
           {categories?.map((category) => (
             <option value={category.id} key={category.id}>
               {category.name}
@@ -72,6 +89,15 @@ const FlashCardForm = ({ setFlashcards, setLoading }) => {
           defaultValue={10}
           ref={amountRef}
         />
+      </div>
+      <div className="form-group">
+        <label htmlFor="difficulty">Difficulty</label>
+        <select id="difficulty" ref={difficultyRef}>
+          <option value="">Any Difficulty</option>
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+        </select>
       </div>
       <div className="form-group">
         <button className="btn">Generate</button>
